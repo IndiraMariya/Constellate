@@ -7,6 +7,11 @@ includes **real macOS window vibrancy** (the frosted-glass effect).
 This README is written to *teach*. Each file is explained so you understand what a Tauri
 app actually is, not just how to run it.
 
+<p align="center">
+  <img src="image1.png" width="49%" alt="Constellate — the night sky of tasks" />
+  <img src="image2.png" width="49%" alt="Constellate — a task in focus" />
+</p>
+
 ---
 
 ## The mental model
@@ -121,9 +126,10 @@ apply_vibrancy(
 ```
 
 The web side cooperates via `src/index.html`: the page background is transparent (so the OS
-frost shows through) while the cards stay readable. `lib.rs` also forces a light appearance so
-the frost never goes dark, even in macOS dark mode. If you ever want a plain solid window,
-set `"transparent": false` in `tauri.conf.json` and give `body` a solid background.
+frost shows through) while the cards stay readable. `lib.rs` also forces a dark appearance to
+match the night-sky UI, so the frost stays dark even in macOS light mode. If you ever want a
+plain solid window, set `"transparent": false` in `tauri.conf.json` and give `body` a solid
+background.
 
 **Materials to try** (just change the one word):
 - `HudWindow` — soft neutral frost (current)
