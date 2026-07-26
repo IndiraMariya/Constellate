@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#18203c"/>
+      <stop offset="100%" stop-color="#0a0e20"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background: no rounding, no transparency, never white -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0a0e20"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#tile)"/>
+
+  <!-- minimal constellation: thin lines, small refined stars, generous negative space -->
+  <g stroke="#e8d6a0" stroke-width="6" stroke-linecap="round" opacity="0.45">
+    <line x1="392" y1="452" x2="560" y2="392"/>
+    <line x1="560" y1="392" x2="668" y2="520"/>
+    <line x1="668" y1="520" x2="600" y2="640"/>
+  </g>
+  <g fill="#f4ecd0">
+    <circle cx="392" cy="452" r="11"/>
+    <circle cx="560" cy="392" r="20"/>
+    <circle cx="668" cy="520" r="9"/>
+    <circle cx="600" cy="640" r="13"/>
+  </g>
+</svg>

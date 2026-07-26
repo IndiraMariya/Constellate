@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellate</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font:"Satoshi",-apple-system,"SF Pro Text",BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+    --display:"Satoshi","SF Pro Display",-apple-system,BlinkMacSystemFont,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --gold:#e8d6a0; --gold-soft:#f5ecc9;
+    --link:rgba(150,180,235,0.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:dark}
+  html,body{height:100%}
+  body{font-family:var(--font);color:#eef1f8;-webkit-font-smoothing:antialiased;letter-spacing:-0.01em;background:#05060f;overflow-x:hidden;overflow-y:auto}
+  #sky{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  .drag{position:fixed;top:0;left:0;right:0;height:46px;-webkit-app-region:drag;z-index:5}
+  [data-tauri-drag-region]{-webkit-app-region:drag}
+
+  .topbar{position:fixed;top:0;left:0;right:0;height:46px;display:flex;align-items:center;justify-content:center;z-index:12}
+  .brand{font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:.32em;color:rgba(240,235,210,.9);text-shadow:0 0 18px rgba(232,214,160,.4)}
+  .clock{position:absolute;right:140px;font-family:var(--mono);font-size:11px;color:rgba(200,210,235,.55)}
+  .gear{position:fixed;top:9px;right:12px;z-index:13;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:rgba(240,240,255,.8);height:30px;padding:0 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;-webkit-app-region:no-drag}
+  .gear:hover{background:rgba(255,255,255,.14)}
+
+  .capture{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:min(560px,calc(100% - 40px));z-index:12}
+  .bottom-scrim{position:fixed;left:0;right:0;bottom:0;height:160px;z-index:11;pointer-events:none;background:linear-gradient(to top,rgba(4,5,14,0.85),rgba(4,5,14,0.4) 45%,rgba(4,5,14,0))}
+  .capbox{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(58,47,102,0.42),rgba(36,26,69,0.42) 55%,rgba(122,58,84,0.36));border:1px solid rgba(232,214,160,0.22);border-radius:18px;padding:6px 6px 6px 12px;
+    box-shadow:0 12px 42px rgba(0,0,20,.5);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+  .capbox:focus-within{border-color:rgba(232,214,160,.55);box-shadow:0 0 0 3px rgba(232,214,160,.12),0 12px 42px rgba(0,0,20,.5)}
+  .star-i{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:radial-gradient(circle at 40% 38%,#fff,#f5ecc9 45%,#d9c27f 100%);box-shadow:0 0 8px rgba(232,214,160,.6)}
+  .capfield{position:relative;flex:1;min-width:0;display:flex}
+  .capmirror{position:absolute;inset:0;padding:0 4px 0 0;font-family:var(--display);font-size:16px;font-weight:500;line-height:38px;
+    white-space:pre;overflow:hidden;pointer-events:none;color:#eef1f8}
+  .capmirror .tag{color:var(--gold);text-shadow:0 0 10px rgba(232,214,160,.5)}
+  .capmirror .ph{color:rgba(200,210,235,.5)}
+  #cap{position:relative;width:100%;border:none;background:transparent;color:transparent;caret-color:#eef1f8;
+    font-family:var(--display);font-size:16px;font-weight:500;line-height:38px;height:38px;padding:0 4px 0 0;outline:none;z-index:1}
+  #cap::placeholder{color:transparent}
+  .addbtn{border:none;background:linear-gradient(135deg,#f5ecc9,#d9c27f);color:#2a2410;border-radius:13px;width:38px;height:38px;font-size:20px;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center;transition:.14s;font-weight:700}
+  .addbtn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(232,214,160,.35)}
+  .addbtn:active{transform:scale(.92)}
+  .caphint{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center;font-size:10.5px;color:rgba(200,210,235,.5);margin-top:8px}
+  .caphint kbd{font-family:var(--mono);font-size:10px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:1px 5px;color:rgba(232,214,160,.9)}
+
+  #tip{position:fixed;z-index:11;pointer-events:none;transform:translate(-50%,-160%);background:rgba(12,16,32,.78);color:#eef1f8;font-size:12.5px;font-weight:500;padding:6px 12px;border-radius:10px;
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;transition:opacity .16s;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1)}
+  #tip.show{opacity:1}
+  #tip .tags{color:var(--gold);font-size:11px;margin-top:2px;font-family:var(--mono)}
+
+  .sheet{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:30px;background:rgba(5,6,15,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  .sheet.open{display:flex}
+  .card{max-width:440px;width:100%;background:rgba(18,22,40,0.92);border:1px solid rgba(255,255,255,.12);border-radius:22px;padding:24px;box-shadow:0 30px 90px rgba(0,0,25,.6);
+    -webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);color:#eef1f8;animation:pop .3s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+  .card .kick{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+  .card h2{font-family:var(--display);font-size:22px;font-weight:650;letter-spacing:-0.02em;margin-bottom:6px;outline:none}
+  .card h2:focus{background:rgba(255,255,255,.07);border-radius:6px;box-shadow:0 0 0 2px var(--gold)}
+  .card .why{font-size:13px;color:rgba(200,210,235,.7);margin-bottom:12px}
+  .tagrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .tagchip{font-size:11px;font-weight:600;color:var(--gold);background:rgba(232,214,160,.12);border:1px solid rgba(232,214,160,.28);border-radius:20px;padding:2px 10px;font-family:var(--mono)}
+  .steps{background:rgba(255,255,255,.05);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .steps .lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+  .steps ul{list-style:none}
+  .steps li{font-size:13px;color:rgba(220,225,240,.85);padding:3px 0 3px 18px;position:relative;white-space:pre-wrap}
+  .steps li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(232,214,160,.6)}
+  .stream{font-size:13px;color:#eef1f8;white-space:pre-wrap;padding-left:18px;position:relative}
+  .stream::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(232,214,160,.6)}
+  .stream.dots::after{content:"…";animation:blink 1.2s infinite}
+  @keyframes blink{0%,60%{opacity:1}100%{opacity:.25}}
+  .cardacts{display:flex;gap:8px;flex-wrap:wrap}
+  .cardfoot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+  .linkbtn{background:none;border:none;padding:2px 0;font-family:var(--font);font-size:12px;font-weight:500;color:rgba(200,210,235,.6);cursor:pointer;transition:.14s}
+  .linkbtn:hover{color:rgba(232,214,160,.95)}
+  .linkbtn.danger:hover{color:rgba(240,140,120,.95)}
+  .pill{border:none;border-radius:20px;padding:9px 18px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.14s}
+  .pill.primary{background:linear-gradient(135deg,#f5ecc9,#d9c27f);color:#2a2410}
+  .pill.primary:hover{filter:brightness(1.05)}
+  .pill.ghost{background:rgba(255,255,255,.08);color:rgba(220,225,240,.8)}
+  .pill.ghost:hover{background:rgba(255,255,255,.14)}
+  .banner{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:14;background:rgba(200,85,61,.92);color:#fff;border-radius:12px;padding:8px 14px;font-size:12.5px;font-weight:500;display:none}
+  .scard input{width:100%;border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:10px 12px;font-family:var(--font);font-size:13px;background:rgba(255,255,255,.05);color:#eef1f8;margin:12px 0;outline:none}
+  .scard input:focus{border-color:var(--gold)}
+  .scard p{font-size:12.5px;color:rgba(200,210,235,.7);line-height:1.5}
+  .scard p a{color:var(--gold);font-weight:600}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:16px 0 4px}
+  .setrow-t{font-size:13px;font-weight:600;color:#eef1f8}
+  .setrow-s{font-size:11.5px;color:rgba(200,210,235,.6);margin-top:2px}
+  .toggle{flex:0 0 auto;width:42px;height:24px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);cursor:pointer;position:relative;transition:.16s;padding:0}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:rgba(240,235,210,.85);transition:.16s}
+  .toggle.on{background:linear-gradient(135deg,#f5ecc9,#d9c27f);border-color:rgba(232,214,160,.7)}
+  .toggle.on .knob{left:20px;background:#2a2410}
+  .nlbl{display:block;font-size:11px;font-weight:600;color:rgba(210,218,238,.8);margin-top:12px}
+  .nhint{font-weight:400;color:rgba(200,210,235,.45);font-style:italic}
+  #newstar .scard input{margin:6px 0 0}
+  #newstar input[type=date]{color-scheme:dark}
+
+  .scroll-cue{position:fixed;left:50%;bottom:128px;transform:translateX(-50%);z-index:11;font-size:11px;color:rgba(200,210,235,.5);pointer-events:none;animation:bob 2.4s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,5px)}}
+  .skyspace{height:100vh;position:relative;z-index:1;pointer-events:none}
+  .listpanel{position:relative;z-index:2;min-height:100vh;background:rgba(10,13,26,0.92);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);border-radius:26px 26px 0 0;box-shadow:0 -20px 60px rgba(0,0,20,.5);color:#eef1f8;padding:26px 22px 60px}
+  .grip{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);margin:0 auto 20px}
+  .listhead{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .listhead h2{font-family:var(--display);font-size:20px;font-weight:650}
+  .listhead .streak{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(200,210,235,.5)}
+  .seg{display:inline-flex;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:2px;margin-bottom:16px}
+  .seg button{border:none;background:transparent;color:rgba(200,210,235,.7);font-family:var(--font);font-size:12px;font-weight:600;padding:5px 13px;border-radius:7px;cursor:pointer}
+  .seg button.on{background:rgba(232,214,160,.9);color:#2a2410}
+  .zone-label{font-size:11px;font-weight:700;color:rgba(180,190,215,.6);text-transform:uppercase;letter-spacing:.06em;margin:14px 2px 8px}
+  .row{display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:12px 14px;margin-bottom:7px;transition:.14s;cursor:pointer}
+  .row:hover{border-color:rgba(232,214,160,.3);background:rgba(255,255,255,.06)}
+  .rtick{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(200,210,235,.4);cursor:pointer;transition:.14s;margin-top:2px;position:relative}
+  .rtick:hover{border-color:var(--gold)}
+  .row.done{opacity:.45}
+  .row.done .rtick{background:var(--gold);border-color:var(--gold)}
+  .row.done .rtick::after{content:"✓";position:absolute;inset:0;color:#2a2410;font-size:11px;line-height:15px;text-align:center}
+  .row.done .rt{text-decoration:line-through;color:rgba(200,210,235,.5)}
+  .rbody{flex:1;min-width:0}
+  .rt{font-size:14px;font-weight:500;cursor:pointer}
+  .rmeta{display:flex;gap:9px;margin-top:4px;font-size:11px;color:rgba(180,190,215,.6);flex-wrap:wrap;align-items:center}
+  .rmeta .now{color:#f0a17a;font-weight:600}
+  .rmeta .over{color:#e07a5a;font-weight:600}
+  .rmeta .tag{color:var(--gold);font-family:var(--mono)}
+  .rmeta .resting-tag{color:rgba(150,165,210,.75);font-style:italic}
+  .row.resting{opacity:.55}
+  .listempty{color:rgba(180,190,215,.5);font-size:13px;padding:14px;text-align:center}
+  .backtop{position:fixed;right:16px;bottom:16px;z-index:13;background:rgba(232,214,160,.9);color:#2a2410;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:none}
+  .prio-row{margin-bottom:16px}
+  .prio-lbl{display:block;font-size:11px;color:rgba(200,210,235,.6);margin-bottom:7px;font-style:italic}
+  .prio-seg{display:flex;gap:6px}
+  .prio-seg button{flex:1;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(210,218,238,.75);font-family:var(--font);font-size:11.5px;font-weight:600;padding:7px 6px;border-radius:10px;cursor:pointer;transition:.14s}
+  .prio-seg button:hover{border-color:rgba(232,214,160,.4)}
+  .prio-seg button.on{background:rgba(232,214,160,.16);border-color:rgba(232,214,160,.55);color:var(--gold);box-shadow:0 0 14px rgba(232,214,160,.15)}
+  .wishbtn{position:fixed;top:8px;right:96px;z-index:13;width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 38% 32%,#3a2f66,#241a45 70%,#181233);border:1px solid rgba(232,214,160,.4);border-radius:50%;cursor:pointer;-webkit-app-region:no-drag;transition:.18s;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 10px rgba(0,0,20,.4)}
+  .wishbtn .wstar{width:15px;height:15px;
+    background:radial-gradient(circle at 48% 42%,#fff,#f5ecc9 42%,#e8d6a0 100%);
+    clip-path:polygon(50% 0%,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0% 50%,40% 40%);
+    filter:drop-shadow(0 0 5px rgba(245,236,201,.9));animation:pulse 2.6s ease-in-out infinite}
+  .wishbtn:hover{transform:translateY(-1px) scale(1.06);border-color:rgba(232,214,160,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 0 18px rgba(232,214,160,.5),0 3px 14px rgba(0,0,20,.5)}
+  .wishbtn:active{transform:scale(.94)}
+  .wish{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;flex-direction:column;padding:32px;text-align:center;background:radial-gradient(circle at 50% 40%,rgba(20,26,54,.85),rgba(5,6,15,.96));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .wish.open{display:flex}
+  .wish .eye{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+  .wish .bigstar{width:16px;height:16px;border-radius:50%;margin:0 auto 16px;background:radial-gradient(circle at 40% 38%,#fff,#f5ecc9 40%,#d9c27f 100%);box-shadow:0 0 30px rgba(232,214,160,.7),0 0 60px rgba(232,214,160,.35);animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.12);opacity:1}}
+  .wish h1{font-family:var(--display);font-size:28px;font-weight:650;letter-spacing:-0.02em;max-width:460px;margin-bottom:8px;line-height:1.25}
+  .wish .wsub{color:rgba(200,210,235,.7);font-size:14px;margin-bottom:8px}
+  .wish .wsteps{list-style:none;max-width:340px;margin:14px auto 26px;text-align:left}
+  .wish .wsteps li{font-size:13.5px;color:rgba(215,222,240,.85);padding:5px 0 5px 20px;position:relative}
+  .wish .wsteps li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(232,214,160,.6)}
+  .wish .wact{display:flex;gap:10px}
+  .wish .whisper{margin-top:22px;font-size:12px;color:rgba(200,210,235,.5);font-style:italic;max-width:420px}
+  .toast{position:fixed;left:50%;top:64px;transform:translateX(-50%) translateY(-8px);z-index:40;background:rgba(232,214,160,.95);color:#2a2410;font-size:13px;font-weight:600;padding:9px 18px;border-radius:20px;box-shadow:0 8px 30px rgba(0,0,20,.4);opacity:0;transition:.35s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+  <div class="drag" data-tauri-drag-region></div>
+  <div class="topbar" data-tauri-drag-region><span class="brand">CONSTELLATE</span><span class="clock" id="clock"></span></div>
+  <button class="gear" id="gear" title="Settings">Settings</button>
+  <button class="wishbtn" id="wishBtn" title="Focus on one star" aria-label="Focus on one star"><span class="wstar"></span></button>
+  <div class="toast" id="toast"></div>
+
+  <div class="wish" id="wish">
+    <div class="eye">Wish upon one star</div>
+    <div class="bigstar"></div>
+    <h1 id="wishTitle"></h1>
+    <div class="wsub" id="wishWhy"></div>
+    <ul class="wsteps" id="wishSteps"></ul>
+    <div class="wact">
+      <button class="pill primary" id="wishDone">Made it happen</button>
+      <button class="pill ghost" id="wishNext">Another star</button>
+      <button class="pill ghost" id="wishClose">Back to the sky</button>
+    </div>
+    <div class="whisper" id="wishWhisper"></div>
+  </div>
+
+  <div class="wish" id="report">
+    <div class="eye">Tonight's sky</div>
+    <div class="bigstar"></div>
+    <h1 id="reportGreet"></h1>
+    <div class="wsub" id="reportLine"></div>
+    <ul class="wsteps" id="reportPoints"></ul>
+    <div class="wact">
+      <button class="pill primary" id="reportFocus">Focus on one</button>
+      <button class="pill ghost" id="reportClose">See the sky</button>
+    </div>
+    <div class="whisper" id="reportWhisper"></div>
+  </div>
+  <div class="banner" id="banner"></div>
+  <div id="tip"></div>
+  <div class="bottom-scrim"></div>
+
+  <div class="capture">
+    <div class="capbox">
+      <span class="star-i"></span>
+      <div class="capfield">
+        <div class="capmirror" id="capMirror"><span class="ph">Name a star, press enter — AI fills in the rest</span></div>
+        <input id="cap" type="text" autocomplete="off" autofocus>
+      </div>
+      <button class="addbtn" id="add" title="Add details manually">+</button>
+    </div>
+    <div class="caphint">
+      <span><kbd>enter</kbd> AI-generates a star</span>
+      <span><kbd>+</kbd> add the details yourself</span>
+      <span><kbd>⌘K</kbd> jump here · <kbd>⌘↵</kbd> focus</span>
+    </div>
+  </div>
+
+  <div class="scroll-cue" id="scrollCue">scroll for the full list</div>
+  <div class="skyspace"></div>
+  <div class="listpanel">
+    <div class="grip"></div>
+    <div class="listhead"><h2>Every star</h2><span class="streak" id="listStreak"></span></div>
+    <div class="seg" id="seg"><button data-f="all" class="on">All</button><button data-f="now">Now</button><button data-f="stale">Waiting</button></div>
+    <div id="listBody"></div>
+  </div>
+  <button class="backtop" id="backtop">Back to sky</button>
+
+  <div class="sheet" id="sheet">
+    <div class="card">
+      <div class="kick" id="cKick"></div>
+      <h2 id="cTitle" contenteditable="true" spellcheck="false"></h2>
+      <div class="why" id="cWhy"></div>
+      <div class="tagrow" id="cTags"></div>
+      <div class="prio-row" id="cPrio">
+        <span class="prio-lbl">Priority</span>
+        <div class="prio-seg">
+          <button data-p="someday">eventually</button>
+          <button data-p="soon">this week</button>
+          <button data-p="now">now</button>
+        </div>
+      </div>
+      <div id="cSteps"></div>
+      <div class="cardacts">
+        <button class="pill primary" id="cDone">Done</button>
+        <button class="pill ghost" id="cBreak">Break it down</button>
+      </div>
+      <div class="cardfoot">
+        <button class="linkbtn" id="cSnooze" title="Hide this star for a while, then let it drift back">Rest this star</button>
+        <button class="linkbtn danger" id="cDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="settings">
+    <div class="card scard">
+      <div class="kick">AI elaboration</div>
+      <p>With a free Google Gemini key, task breakdowns are written live. Without one, thoughtful built-in drafts are used. The key stays only on this Mac. Get one free at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>.</p>
+      <input id="apiKey" type="password" placeholder="Gemini API key (blank = built-in drafts)">
+      <div class="setrow">
+        <div><div class="setrow-t">Gentle nudges</div><div class="setrow-s">A quiet notification when a star's time comes.</div></div>
+        <button class="toggle" id="notifToggle" role="switch"><span class="knob"></span></button>
+      </div>
+      <div class="cardacts"><button class="pill primary" id="saveKey">Save</button></div>
+    </div>
+  </div>
+
+  <div class="sheet" id="newstar">
+    <div class="card scard">
+      <div class="kick">New star</div>
+      <label class="nlbl">What is it?</label>
+      <input id="nsTitle" type="text" placeholder="e.g. Email professor for Perlmutter access" autocomplete="off">
+      <label class="nlbl">Tags <span class="nhint">space or comma separated</span></label>
+      <input id="nsTags" type="text" placeholder="lab work" autocomplete="off">
+      <label class="nlbl">Due date <span class="nhint">optional</span></label>
+      <input id="nsDate" type="date">
+      <div class="prio-row" style="margin-top:16px">
+        <span class="prio-lbl">Priority — this is what orders your sky</span>
+        <div class="prio-seg" id="nsPrio">
+          <button data-p="now">now</button>
+          <button data-p="soon" class="on">this week</button>
+          <button data-p="someday">eventually</button>
+        </div>
+      </div>
+      <div class="cardacts"><button class="pill primary" id="nsSave">Add to the sky</button><button class="pill ghost" id="nsCancel">Cancel</button></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const STORE="constellate.tasks.v1", AKEY="clearing.gemini.key", STREAK="constellate.streak.v1";
+const GEMINI_MODEL="gemini-3.5-flash-lite";
+const now=new Date();
+let tasks=load();
+function load(){ try{return JSON.parse(localStorage.getItem(STORE))||[]}catch(e){return[]} }
+function save(){ localStorage.setItem(STORE,JSON.stringify(tasks)); }
+
+/* ---- classification + tags ---- */
+const WORK=["lab","research","hpc","competition","compete","math","camp","prep","study","exam","paper","code","project","internship","interview","resume","cv","apply","application","deadline","assignment","homework","class","course","thesis","grant","conference","practice","leetcode","training","scholarship"];
+const LIFE=["buy","mattress","bag","friend","hang","dinner","lunch","coffee","gift","clean","room","laundry","doctor","dentist","haircut","mom","dad","family","gym","workout","book","movie","trip","travel","birthday","grocery","cook","water","sleep","rest","journal"];
+const SOON=["today","tonight","tomorrow","monday","tuesday","wednesday","thursday","friday","saturday","sunday","week","asap","soon","due","deadline"];
+const DAYS={sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6};
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function parseDue(t){
+  let m=t.match(/by\s+([a-z]{3,9})\s*(\d{1,2})/i);
+  if(m&&MONTHS[m[1].slice(0,3).toLowerCase()]!==undefined){ let d=new Date(now.getFullYear(),MONTHS[m[1].slice(0,3).toLowerCase()],parseInt(m[2])); if(d<now-86400000)d.setFullYear(d.getFullYear()+1); return d.getTime(); }
+  for(const [name,dow] of Object.entries(DAYS)){ if(t.includes(name)){ let d=new Date(now); let a=(dow-now.getDay()+7)%7; if(a===0)a=7; d.setDate(d.getDate()+a); d.setHours(0,0,0,0); return d.getTime(); } }
+  if(/tomorrow/.test(t)){ let d=new Date(now); d.setDate(d.getDate()+1); d.setHours(0,0,0,0); return d.getTime(); }
+  if(/today|tonight/.test(t)){ let d=new Date(now); d.setHours(23,0,0,0); return d.getTime(); }
+  return null;
+}
+function classify(text){
+  let t=text.toLowerCase(),pri=null;
+  // pull ALL #tags (these drive the constellations)
+  const tags=[...text.matchAll(/#(\w+)/g)].map(m=>m[1].toLowerCase());
+  if(/!now\b/.test(t))pri="now"; if(/!soon\b/.test(t))pri="soon"; if(/!someday\b/.test(t))pri="someday";
+  const due=parseDue(t); const clean=text.replace(/#\w+/g,"").replace(/![a-z]+/g,"").trim(); const ct=clean.toLowerCase();
+  // auto-add a work/life tag if none present, so lone tasks still cluster naturally
+  let cat=null;
+  if(tags.includes("work"))cat="work"; else if(tags.includes("life"))cat="life";
+  if(!cat){ let w=WORK.reduce((n,k)=>n+(ct.includes(k)?1:0),0), l=LIFE.reduce((n,k)=>n+(ct.includes(k)?1:0),0); cat=w>l&&w>0?"work":(l>0?"life":null); }
+  const allTags=[...new Set(tags.concat(cat?[cat]:[]))];
+  if(!pri){ if(due||SOON.some(k=>ct.includes(k)))pri="soon"; else if(/mattress|bag|book|movie|someday|eventually|maybe/.test(ct))pri="someday"; else pri="soon"; }
+  if(/\b(sign up|register|deadline|due|expires?)\b/.test(ct)||(due&&due<now+2*86400000))pri="now";
+  return {tags:allTags,cat:cat||"life",pri,clean:clean||text,due};
+}
+function draftSteps(title){
+  const t=title.toLowerCase();
+  if(/mattress/.test(t))return["Decide firmness + budget range","Read 2-3 reviews","Check the return/trial policy"];
+  if(/\bbag\b/.test(t))return["Note the 2-3 styles you like","Set a max price","Bookmark options, sleep on it"];
+  if(/(hang|friend|dinner|lunch|coffee)/.test(t))return["Text them 2 day options","Pick a spot between you","Lock a time"];
+  if(/(sign up|register|camp|apply|application)/.test(t))return["Open the official page","Note deadline + requirements","Fill it in one sitting"];
+  if(/(hpc|competition|compete)/.test(t))return["Pull a past round","Book 2 short practice blocks","Drill your weakest area"];
+  if(/(lab|research)/.test(t))return["Write the next concrete action","Timebox 45 min","Note where you stopped"];
+  if(/(study|exam|prep|math)/.test(t))return["List topics, mark the shakiest","One pass on the weakest","Quick self-quiz"];
+  return["Name the first small action","Give it 15 focused minutes","Note where you stop"];
+}
+const PRI={now:"now",soon:"this week",someday:"eventually"};
+function ageDays(t){return (Date.now()-t.created)/86400000}
+function snoozed(t){return t.snoozeUntil&&t.snoozeUntil>Date.now()}
+function hot(t){ const a=ageDays(t); if(t.due&&t.due<Date.now())return true; return a>=7; }
+function dueLabel(t){ if(!t.due)return null; const d=Math.round((t.due-Date.now())/86400000); if(d<0)return{txt:`${-d}d overdue`,over:true}; if(d===0)return{txt:"due today",over:false}; if(d===1)return{txt:"due tomorrow",over:false}; return{txt:`due in ${d}d`,over:false}; }
+function whyLine(t){ const dl=dueLabel(t); if(dl&&dl.over)return dl.txt+" — a small step still counts"; if(dl)return dl.txt; if(t.desc)return t.desc; const a=Math.floor(ageDays(t)); return a>=7?`waiting ${a} days`:t.pri==="now"?"time-sensitive":t.cat==="work"?"steady progress feels good":"a small personal win"; }
+function bumpStreak(){ let s={}; try{s=JSON.parse(localStorage.getItem(STREAK))||{}}catch(e){} const today=new Date().toDateString(); if(s.last!==today){ const y=new Date(Date.now()-86400000).toDateString(); s.count=s.last===y?(s.count||0)+1:1; s.last=today; localStorage.setItem(STREAK,JSON.stringify(s)); } }
+// manual add: no AI, keep exactly what the user typed (local classify only)
+function addManual(raw){ const text=raw.trim(); if(!text)return; const c=classify(text);
+  const t={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:c.clean,tags:c.tags,cat:c.cat,pri:c.pri,due:c.due,done:false,created:Date.now(),steps:null,snoozeUntil:null,desc:null,userTagged:c.tags.length>0};
+  tasks.unshift(t); save(); layoutStars(); renderList(); return t;
+}
+// AI add: let Gemini rewrite the message into a clean task (title + tags + due + desc)
+function add(raw){ const text=raw.trim(); if(!text)return;
+  const key=localStorage.getItem(AKEY);
+  const t=addManual(text);            // create immediately from local parse
+  if(!key)return;                     // no key → stays exactly as typed
+  t._enriching=true;
+  transform(text,existingTags()).then(res=>{ t._enriching=false;
+    if(!res||(!res.title&&!res.tags.length&&!res.due&&!res.desc)){ banner("Gemini didn't respond cleanly — kept your note as typed."); return; }
+    let changed=false;
+    if(res.title&&res.title.toLowerCase()!==t.title.toLowerCase()){ t.title=res.title; changed=true; }
+    if(res.tags&&res.tags.length){ const merged=[...new Set(t.tags.concat(res.tags))]; if(merged.length!==t.tags.length){ t.tags=merged; changed=true; } }
+    if(res.due&&!t.due){ t.due=res.due; changed=true; }
+    if(res.desc){ t.desc=res.desc; changed=true; }
+    if(changed){ t.pri=classify(t.title+(t.due?" due":"")).pri; if(t.due&&t.due<Date.now()+2*86400000)t.pri="now"; save(); layoutStars(); renderList(); if(current===t)openTask(t); }
+  }).catch(e=>{ t._enriching=false;
+    const msg=e&&e.code===429?"Gemini is rate-limited right now — kept your note as typed."
+      :e&&e.code===400?`Gemini rejected the request${e.detail?": "+e.detail.slice(0,80):""}`
+      :e&&e.code===403?"Gemini key invalid or not enabled — check Settings."
+      :e&&e.code===404?"That Gemini model isn't available to this key."
+      :e&&e.code?`Gemini error ${e.code} — kept your note as typed.`
+      :e instanceof TypeError?"Can't reach Gemini here (blocked in this preview). It works in the real app."
+      :"AI unavailable — kept your note as typed.";
+    banner(msg); });
+}
+
+const SYS="You are the gentle planning assistant inside Constellate, a calm task app where tasks are stars. Reduce stress, never add it. Be warm, concrete, and brief. Break things into the smallest honest first step. Never invent deadlines. Never use urgency or exclamation marks. Follow the requested output format exactly and output nothing else.";
+const SYS_TRANSFORM="You convert a rough note into one clean, structured to-do. Be concise and literal. Resolve any date the user mentions to a real calendar date, but never invent a date the user did not imply. Output only the requested lines in the exact format, no markdown, no commentary.";
+async function geminiStream(prompt,onDelta,sys){
+  const key=localStorage.getItem(AKEY); if(!key)return null;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`;
+  const body={systemInstruction:{parts:[{text:sys||SYS}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:512,temperature:0.4,topP:0.9}};
+  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  if(!res.ok)throw {code:res.status}; if(!res.body)return null;
+  const reader=res.body.getReader(),dec=new TextDecoder(); let buf="",full="";
+  for(;;){ const {done,value}=await reader.read(); if(done)break; buf+=dec.decode(value,{stream:true}); const lines=buf.split("\n"); buf=lines.pop()||"";
+    for(const ln of lines){ if(!ln.startsWith("data:"))continue; try{ const ev=JSON.parse(ln.slice(5).trim()); const txt=ev?.candidates?.[0]?.content?.parts?.[0]?.text; if(txt){ full+=txt; onDelta&&onDelta(full); } }catch(e){} } }
+  return full;
+}
+function toLines(txt){ return txt.split("\n").map(s=>s.replace(/^[\d\.\-\*\s]+/,"").trim()).filter(Boolean); }
+function banner(msg){ const b=$("#banner"); b.textContent=msg; b.style.display="block"; setTimeout(()=>{b.style.display="none"},6000); }
+// Non-streaming call that asks for JSON back. Tries responseSchema first (strict),
+// and if the model rejects the schema (400), retries with plain JSON mode. Returns a
+// parsed object, or throws {code} so the caller can show a specific reason.
+async function geminiJSON(prompt,sys,schema){
+  const key=localStorage.getItem(AKEY); if(!key)return null;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  const call=async(gen)=>{
+    const body={ systemInstruction:{parts:[{text:sys}]}, contents:[{role:"user",parts:[{text:prompt}]}], generationConfig:gen };
+    const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(!res.ok){ let detail=""; try{ detail=(await res.json())?.error?.message||""; }catch(e){} throw {code:res.status,detail}; }
+    return res.json();
+  };
+  const parse=(data)=>{ let txt=data?.candidates?.[0]?.content?.parts?.[0]?.text; if(!txt)return null;
+    txt=txt.replace(/```json\s*|```/gi,"").trim();
+    try{ return JSON.parse(txt); }catch(e){ const m=txt.match(/\{[\s\S]*\}/); return m?JSON.parse(m[0]):null; } };
+  try{
+    return parse(await call({temperature:0.3,topP:0.9,maxOutputTokens:512,responseMimeType:"application/json",responseSchema:schema}));
+  }catch(e){
+    if(e.code===400){ // schema unsupported → retry with plain JSON mode
+      return parse(await call({temperature:0.3,topP:0.9,maxOutputTokens:512,responseMimeType:"application/json"}));
+    }
+    throw e;
+  }
+}
+async function getSteps(title,onDelta){
+  try{ const full=await geminiStream(`Break this task into exactly 3 tiny, calm, concrete first steps. Return only 3 lines, each a short imperative, no numbering, no preamble.\n\nTask: ${title}`,onDelta);
+    if(full==null)return draftSteps(title); const p=toLines(full).slice(0,3); return p.length?p:draftSteps(title);
+  }catch(e){ banner(e.code===429?"Gemini is busy for a moment — used built-in steps.":"AI unavailable — used built-in steps."); return draftSteps(title); }
+}
+function hash(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0)/4294967295; }
+
+// existing tag networks (tags used by 1+ active tasks)
+function existingTags(){ return [...new Set(tasks.filter(t=>!t.done).flatMap(t=>t.tags||[]))]; }
+
+// Turn a raw message into a clean task: a short action title, tags (joining
+// existing networks when they fit), an absolute due date resolved from relative
+// wording, and a warm one-line description. Returns null on no key / error.
+async function transform(message,pool){
+  const key=localStorage.getItem(AKEY); if(!key)return null;
+  const today=new Date(); const iso=today.toISOString().slice(0,10);
+  const dow=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][today.getDay()];
+  // precompute the next few named days so the model doesn't have to do date math
+  const nextDate=(target)=>{ const d=new Date(today); let a=(target-today.getDay()+7)%7; if(a===0)a=7; d.setDate(d.getDate()+a); return d.toISOString().slice(0,10); };
+  const tomorrow=new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const hints=[
+    `today = ${iso}`,
+    `tomorrow = ${tomorrow.toISOString().slice(0,10)}`,
+    `this weekend / this saturday = ${nextDate(6)}`,
+    `this sunday = ${nextDate(0)}`,
+    `next monday = ${nextDate(1)}`, `next friday = ${nextDate(5)}`
+  ].join("; ");
+  const prompt=`Convert this note into a single clean to-do. Today is ${dow}, ${iso}.
+Date reference (use these exact dates): ${hints}.
+Existing tags to reuse when they fit: ${pool&&pool.length?pool.join(", "):"(none yet)"}.
+
+Fields:
+- title: a short specific imperative in Title Case, under 8 words. Name the concrete action + object; do not just echo the note.
+- tags: 1-3 short lowercase topic tags, no # symbol. Reuse an existing tag when it fits; invent one only if none fit. Always give at least one.
+- due: the resolved date as YYYY-MM-DD, or empty string "" if the note mentions no time at all.
+- desc: one warm, non-pressuring reason it matters, max 6 words.
+
+Note: ${message}`;
+  const schema={ type:"object", properties:{
+    title:{type:"string"}, tags:{type:"array",items:{type:"string"}}, due:{type:"string"}, desc:{type:"string"}
+  }, required:["title","tags","due","desc"] };
+  const j=await geminiJSON(prompt,SYS_TRANSFORM,schema); if(!j)return null;
+  const title=(j.title||"").trim().replace(/^["']|["']$/g,"");
+  const tags=(Array.isArray(j.tags)?j.tags:[]).map(s=>String(s).trim().toLowerCase().replace(/^#/,"")).filter(Boolean).slice(0,3);
+  let due=null; if(j.due&&/^\d{4}-\d{2}-\d{2}$/.test(String(j.due).trim())){ const d=new Date(String(j.due).trim()+"T09:00:00"); if(!isNaN(d))due=d.getTime(); }
+  const desc=(j.desc||"").trim();
+  return {title,tags,due,desc};
+}
+
+/* ============================================================ STARFIELD (canvas 2D) ============================================================ */
+const canvas=$("#sky"), ctx=canvas.getContext("2d");
+let W=0,H=0,DPR=Math.min(window.devicePixelRatio,2);
+let bgStars=[]; // decorative background stars
+function resize(){ W=window.innerWidth; H=window.innerHeight; canvas.width=W*DPR; canvas.height=H*DPR; canvas.style.width=W+"px"; canvas.style.height=H+"px"; ctx.setTransform(DPR,0,0,DPR,0,0); makeBgStars(); layoutStars(); }
+function makeBgStars(){ bgStars=[]; const n=Math.floor(W*H/6000); for(let i=0;i<n;i++){ bgStars.push({x:Math.random()*W,y:Math.random()*H*0.92,r:Math.random()*1.1+0.2,tw:Math.random()*6.28,sp:0.12+Math.random()*0.22}); } }
+window.addEventListener("resize",resize);
+
+/* task stars: brightness=priority, size=weight, color=urgency; positioned by tag clusters */
+let stars=[]; // {task, x,y, r, bright, hue, tw, appear, fade}
+let starScale=1; // global shrink factor when the sky gets crowded
+let horizonY=0;  // y of the "someday" horizon band (0 = no horizon shown)
+function taskWeight(t){ return Math.min(1,(t.title.length/60)*0.5+(t.pri==="now"?0.5:t.pri==="soon"?0.25:0.08)); }
+function starColor(t){
+  if(t.due&&t.due<Date.now())return "255,150,120";      // overdue → warm red-orange
+  if(hot(t))return "255,190,120";                         // stale → amber
+  if(t.pri==="now")return "255,225,170";                  // now → warm gold
+  if(t.cat==="work")return "190,215,255";                 // work → cool blue-white
+  return "215,235,220";                                    // life → soft green-white
+}
+// Greedy constellation assignment: the tag with the MOST tasks forms its constellation
+// first, claiming all its tasks; the next-biggest tag claims all its *unclaimed* tasks;
+// and so on. Each task lands in the largest tag it belongs to. Unclaimed → lone star.
+function assignConstellations(active){
+  const counts={}; active.forEach(t=>t.tags.forEach(tg=>counts[tg]=(counts[tg]||0)+1));
+  const order=Object.keys(counts).sort((a,b)=> counts[b]-counts[a] || (a<b?-1:1)); // size desc, stable
+  const of={}; // taskId → constellation key
+  for(const tag of order){
+    active.forEach(t=>{ if(of[t.id]===undefined && t.tags.includes(tag)) of[t.id]=tag; });
+  }
+  // any task with no tags → its own lone constellation (unique key)
+  active.forEach(t=>{ if(of[t.id]===undefined) of[t.id]="·"+t.id; });
+  return of;
+}
+
+function layoutStars(){
+  const activeAll=tasks.filter(t=>!t.done&&!snoozed(t));
+  // "someday" stars settle onto the horizon; now/soon fill the constellation sky above
+  const active=activeAll.filter(t=>t.pri!=="someday");
+  const horizon=activeAll.filter(t=>t.pri==="someday");
+  const conOf=assignConstellations(active);
+  // one non-overlapping rectangular cell per constellation; stars clamped inside → no crossings
+  const groups={}; active.forEach(t=>{ const k=conOf[t.id]; (groups[k]=groups[k]||[]).push(t); });
+  // order cells by group size (biggest first) so the largest constellation gets a prime spot
+  const keys=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+  const nG=Math.max(keys.length,1);
+  // zoom out as the sky fills: past ~14 stars, shrink everything toward a floor of 0.55
+  starScale=Math.max(0.55,Math.min(1,14/Math.max(active.length,1)));
+  const hasHorizon=horizon.length>0;
+  horizonY=hasHorizon?H*0.66:0;
+  const cols=Math.ceil(Math.sqrt(nG)); const rows=Math.ceil(nG/cols);
+  const pad=18*starScale;
+  // reserve a strip at the bottom for the horizon when there are someday stars
+  const skyBottom=hasHorizon?H*0.66:H*0.78;
+  const areaX=0.04*W, areaY=52, areaW=0.92*W, areaH=skyBottom-52;
+  const cw=areaW/cols, ch=areaH/rows;
+  const cell={};
+  keys.forEach((k,i)=>{ const cx=i%cols, cy=Math.floor(i/cols);
+    cell[k]={x0:areaX+cx*cw+pad, y0:areaY+cy*ch+pad, x1:areaX+(cx+1)*cw-pad, y1:areaY+(cy+1)*ch-pad}; });
+  const prev=new Map(stars.map(s=>[s.task.id,s]));
+  stars=active.map(t=>{
+    const key=conOf[t.id]; const r=cell[key]; const grp=groups[key]; const idx=grp.indexOf(t); const nn=grp.length;
+    const seed=hash(t.id+t.title);
+    const gc=Math.ceil(Math.sqrt(nn)); const gr=Math.ceil(nn/gc);
+    const gx=idx%gc, gy=Math.floor(idx/gc);
+    const jx=(hash(t.id+"x")-0.5)*0.5, jy=(hash(t.id+"y")-0.5)*0.5;
+    let x=r.x0+((gx+0.5+jx)/gc)*(r.x1-r.x0);
+    let y=r.y0+((gy+0.5+jy)/gr)*(r.y1-r.y0);
+    x=Math.max(r.x0,Math.min(r.x1,x)); y=Math.max(r.y0,Math.min(r.y1,y));
+    const ex=prev.get(t.id);
+    // stable per-star size variety: base from priority/length, times a fixed random factor
+    const sizeVar=0.7+hash(t.id+"size")*0.85; // 0.70 – 1.55
+    return {task:t,con:key,x,y,cell:r,r:(2.2+taskWeight(t)*5.2)*sizeVar*starScale,bright:t.pri==="now"?1:0.75,color:starColor(t),
+      tw:seed*6.28,appear:ex?1:0,fade:1};
+  });
+  // horizon: someday stars as a faint, evenly-spread band low in the sky (no constellation links)
+  const hy0=skyBottom+18, hy1=H*0.78;
+  horizon.forEach((t,i)=>{
+    const seed=hash(t.id+t.title);
+    const fx=(i+0.5)/horizon.length; const x=0.06*W+fx*0.88*W+(hash(t.id+"hx")-0.5)*30;
+    const y=hy0+(hy1-hy0)*(0.35+hash(t.id+"hy")*0.5);
+    const ex=prev.get(t.id);
+    stars.push({task:t,con:"·horizon"+t.id,x,y,cell:null,r:(2+hash(t.id+"size")*1.6)*starScale,bright:0.4,color:"200,210,235",horizon:true,
+      tw:seed*6.28,appear:ex?1:0,fade:1});
+  });
+  // keep any stars still fading out (their task is done, so not in `active`) so the
+  // slow fade animation plays through even when we relayout to rescale the sky
+  for(const s of prev.values()){ if(s.task._fading&&s.fade>0)stars.push(s); }
+  buildLinks();
+}
+// MST over each constellation group (same cell → no cross-group crossings)
+function buildLinks(){
+  links=[]; const groups={};
+  stars.forEach(s=>{ (groups[s.con]=groups[s.con]||[]).push(s); });
+  for(const k in groups){
+    const group=groups[k]; if(group.length<2)continue;   // lone star → independent, no line
+    const inTree=[group[0]]; const rest=group.slice(1);
+    while(rest.length){
+      let best=null,bi=-1,ti=-1,bd=1e18;
+      for(let r=0;r<rest.length;r++)for(let i=0;i<inTree.length;i++){
+        const d=(rest[r].x-inTree[i].x)**2+(rest[r].y-inTree[i].y)**2;
+        if(d<bd){bd=d;best=rest[r];bi=r;ti=i;}
+      }
+      links.push({a:inTree[ti],b:best,strength:1});
+      inTree.push(best); rest.splice(bi,1);
+    }
+  }
+}
+let links=[];
+
+let hovered=null;
+function pick(mx,my){ let best=null,bd=1e9; for(const s of stars){ const d=(s.x-mx)**2+(s.y-my)**2; const hitR=(s.r+12)**2; if(d<hitR&&d<bd){bd=d;best=s;} } return best; }
+window.addEventListener("pointermove",e=>{ if(window.scrollY>H*0.5){hovered=null;return;} const s=pick(e.clientX,e.clientY); const tip=$("#tip");
+  if(s){ hovered=s; tip.innerHTML=`${s.task.title}${s.task.tags.length?`<div class="tags">${s.task.tags.map(x=>"#"+x).join(" ")}</div>`:""}`; tip.style.left=s.x+"px"; tip.style.top=s.y+"px"; tip.classList.add("show"); canvas.style.cursor="pointer"; }
+  else { hovered=null; tip.classList.remove("show"); canvas.style.cursor="default"; } });
+window.addEventListener("click",e=>{ if(window.scrollY>H*0.5)return; const s=pick(e.clientX,e.clientY); if(s)openTask(s.task); });
+
+/* render loop */
+let tPrev=performance.now();
+function draw(now2){
+  const dt=Math.min((now2-tPrev)/1000,0.05); tPrev=now2; const time=now2/1000;
+  ctx.clearRect(0,0,W,H);
+  // sky gradient — deep navy up top, a faint warm horizon at the base
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#05060f"); g.addColorStop(0.5,"#0a0e22"); g.addColorStop(0.86,"#121734"); g.addColorStop(1,"#1a1533");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // two soft nebula glows for depth
+  const mw=ctx.createRadialGradient(W*0.62,H*0.28,10,W*0.62,H*0.28,Math.max(W,H)*0.62);
+  mw.addColorStop(0,"rgba(96,104,180,0.12)"); mw.addColorStop(1,"rgba(96,104,180,0)"); ctx.fillStyle=mw; ctx.fillRect(0,0,W,H);
+  const mw2=ctx.createRadialGradient(W*0.22,H*0.7,10,W*0.22,H*0.7,Math.max(W,H)*0.5);
+  mw2.addColorStop(0,"rgba(150,90,120,0.07)"); mw2.addColorStop(1,"rgba(150,90,120,0)"); ctx.fillStyle=mw2; ctx.fillRect(0,0,W,H);
+  // vignette so the rounded window edges feel deep (reads great against macOS vibrancy)
+  const vg=ctx.createRadialGradient(W*0.5,H*0.42,Math.min(W,H)*0.3,W*0.5,H*0.5,Math.max(W,H)*0.75);
+  vg.addColorStop(0,"rgba(0,0,10,0)"); vg.addColorStop(1,"rgba(0,0,10,0.55)"); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  // background stars twinkle
+  for(const s of bgStars){ const a=0.4+0.14*Math.sin(time*s.sp+s.tw); ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,6.28); ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.fill(); }
+  // "someday" horizon — a soft glowing line low in the sky where distant stars rest
+  if(horizonY>0){
+    const hg=ctx.createLinearGradient(0,horizonY-40,0,horizonY+40);
+    hg.addColorStop(0,"rgba(120,110,170,0)"); hg.addColorStop(0.5,"rgba(120,110,170,0.10)"); hg.addColorStop(1,"rgba(120,110,170,0)");
+    ctx.fillStyle=hg; ctx.fillRect(0,horizonY-40,W,80);
+    const ln=ctx.createLinearGradient(0,0,W,0);
+    ln.addColorStop(0,"rgba(150,160,210,0)"); ln.addColorStop(0.5,"rgba(150,160,210,0.28)"); ln.addColorStop(1,"rgba(150,160,210,0)");
+    ctx.strokeStyle=ln; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,horizonY); ctx.lineTo(W,horizonY); ctx.stroke();
+    ctx.fillStyle="rgba(160,170,210,0.4)"; ctx.font="10px ui-monospace,monospace"; ctx.textAlign="right";
+    ctx.fillText("someday", W-14, horizonY-8); ctx.textAlign="left";
+  }
+  // constellation links (behind stars) — fade with the dimmer of the two stars
+  for(const l of links){ const lf=Math.min(l.a.fade,l.b.fade)*Math.min(l.a.appear,l.b.appear); if(lf<=0.01)continue;
+    const pulse=0.16+0.09*Math.sin(time*0.8+l.a.tw);
+    const grad=ctx.createLinearGradient(l.a.x,l.a.y,l.b.x,l.b.y);
+    grad.addColorStop(0,`rgba(${l.a.color},${pulse*l.strength*lf})`); grad.addColorStop(1,`rgba(${l.b.color},${pulse*l.strength*lf})`);
+    ctx.strokeStyle=grad; ctx.lineWidth=0.6+l.strength*0.25;
+    ctx.beginPath(); ctx.moveTo(l.a.x,l.a.y); ctx.lineTo(l.b.x,l.b.y); ctx.stroke(); }
+  // task stars — realistic: halo + hot core + soft diffraction spikes (additive)
+  ctx.globalCompositeOperation="lighter";
+  for(const s of stars){ if(s.appear<1)s.appear=Math.min(1,s.appear+dt*2); if(s.task._fading){ s.fade=Math.max(0,s.fade-dt*0.35); }
+    const tw=1; const rr=s.r*s.appear*s.fade; if(rr<=0.2)continue;
+    const A=s.bright*s.fade;
+    // outer halo
+    let g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,rr*7);
+    g.addColorStop(0,`rgba(${s.color},${0.55*A})`); g.addColorStop(0.2,`rgba(${s.color},${0.2*A})`); g.addColorStop(1,`rgba(${s.color},0)`);
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,rr*7,0,6.28); ctx.fill();
+    // colored inner glow
+    g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,rr*2.4);
+    g.addColorStop(0,`rgba(255,255,255,${0.95*A})`); g.addColorStop(0.35,`rgba(${s.color},${0.85*A})`); g.addColorStop(1,`rgba(${s.color},0)`);
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,rr*2.4,0,6.28); ctx.fill();
+    // hot white core
+    ctx.fillStyle=`rgba(255,255,255,${A})`; ctx.beginPath(); ctx.arc(s.x,s.y,rr*0.75,0,6.28); ctx.fill();
+    // soft diffraction spikes: 4 tapered gradient rays (bigger/brighter for priority)
+    const spike=rr*(4.5+s.bright*3)*tw;
+    for(let k=0;k<4;k++){ const ang=k*Math.PI/2 + (k>=2?Math.PI/4:0)*0; // horizontal+vertical
+      const dx=Math.cos(k*Math.PI/2), dy=Math.sin(k*Math.PI/2);
+      const rg=ctx.createLinearGradient(s.x,s.y,s.x+dx*spike,s.y+dy*spike);
+      rg.addColorStop(0,`rgba(${s.color},${0.5*A})`); rg.addColorStop(1,`rgba(${s.color},0)`);
+      ctx.strokeStyle=rg; ctx.lineWidth=Math.max(0.6,rr*0.28);
+      ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x+dx*spike,s.y+dy*spike); ctx.stroke();
+    }
+    // faint diagonal shimmer spikes (shorter)
+    const dsp=spike*0.5;
+    for(let k=0;k<4;k++){ const dx=Math.cos(Math.PI/4+k*Math.PI/2), dy=Math.sin(Math.PI/4+k*Math.PI/2);
+      const rg=ctx.createLinearGradient(s.x,s.y,s.x+dx*dsp,s.y+dy*dsp);
+      rg.addColorStop(0,`rgba(${s.color},${0.25*A})`); rg.addColorStop(1,`rgba(${s.color},0)`);
+      ctx.strokeStyle=rg; ctx.lineWidth=Math.max(0.5,rr*0.16);
+      ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x+dx*dsp,s.y+dy*dsp); ctx.stroke();
+    }
+    if(hovered===s){ ctx.globalCompositeOperation="source-over"; ctx.strokeStyle=`rgba(${s.color},0.7)`; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(s.x,s.y,rr*3+8,0,6.28); ctx.stroke(); ctx.globalCompositeOperation="lighter"; }
+  }
+  // shooting stars — a small wish streaks off whenever a task is finished
+  if(shooters.length){
+    ctx.globalCompositeOperation="lighter";
+    for(let i=shooters.length-1;i>=0;i--){ const sh=shooters[i];
+      sh.x+=sh.vx*dt; sh.y+=sh.vy*dt; sh.vy+=6*dt; sh.life-=dt*0.5;
+      if(sh.life<=0){ shooters.splice(i,1); continue; }
+      const tx=sh.x-sh.vx*0.16, ty=sh.y-sh.vy*0.16;
+      const g=ctx.createLinearGradient(sh.x,sh.y,tx,ty);
+      g.addColorStop(0,`rgba(255,250,235,${0.7*sh.life})`);
+      g.addColorStop(1,"rgba(255,250,235,0)");
+      ctx.strokeStyle=g; ctx.lineWidth=1.6; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(sh.x,sh.y); ctx.lineTo(tx,ty); ctx.stroke();
+      ctx.fillStyle=`rgba(255,252,240,${0.8*sh.life})`;
+      ctx.beginPath(); ctx.arc(sh.x,sh.y,1.4,0,6.28); ctx.fill();
+    }
+  }
+  ctx.globalCompositeOperation="source-over";
+  // remove fully-faded completed stars, then relayout so the sky rescales back up
+  let removed=false;
+  for(let i=stars.length-1;i>=0;i--){ if(stars[i].task._fading&&stars[i].fade<=0){ stars.splice(i,1); removed=true; } }
+  if(removed)layoutStars();
+  requestAnimationFrame(draw);
+}
+
+/* task detail */
+let current=null;
+function openTask(t){
+  current=t; $("#cKick").textContent=PRI[t.pri];
+  $("#cTitle").textContent=t.title;
+  const resting=snoozed(t);
+  $("#cWhy").textContent=resting?`Resting — drifts back ${restLabel(t)}`:whyLine(t);
+  $("#cSnooze").textContent=resting?"Wake this star":"Rest this star";
+  renderTagEditor(t);
+  // priority control reflects current, updates on click
+  $("#cPrio").querySelectorAll("button").forEach(b=>{ b.classList.toggle("on",b.dataset.p===t.pri);
+    b.onclick=()=>{ t.pri=b.dataset.p; save(); $("#cKick").textContent=PRI[t.pri]; $("#cWhy").textContent=snoozed(t)?`Resting — drifts back ${restLabel(t)}`:whyLine(t);
+      $("#cPrio").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.p===t.pri));
+      layoutStars(); renderList();
+      if(t.pri==="now")toast("A star burns brighter now"); };
+  });
+  const st=$("#cSteps"); st.innerHTML="";
+  if(t.steps){ st.innerHTML=`<div class="steps"><div class="lbl">A gentle way in</div><ul>${t.steps.map(()=>"<li></li>").join("")}</ul></div>`; st.querySelectorAll("li").forEach((li,i)=>li.textContent=t.steps[i]); }
+  $("#sheet").classList.add("open");
+}
+function restLabel(t){ const d=Math.max(0,Math.ceil((t.snoozeUntil-Date.now())/86400000)); return d<=1?"tomorrow":`in ${d} days`; }
+function renderTagEditor(t){
+  const tr=$("#cTags"); tr.innerHTML="";
+  t.tags.forEach(tag=>{ const chip=document.createElement("span"); chip.className="tagchip"; chip.innerHTML=`#${tag} <span class="x" style="cursor:pointer;opacity:.6;margin-left:2px">×</span>`;
+    chip.querySelector(".x").addEventListener("click",()=>{ t.tags=t.tags.filter(x=>x!==tag); save(); layoutStars(); renderList(); renderTagEditor(t); });
+    tr.appendChild(chip); });
+  const inp=document.createElement("input"); inp.className="tagadd"; inp.placeholder="+ tag";
+  inp.style.cssText="background:transparent;border:1px dashed rgba(232,214,160,.4);border-radius:20px;padding:2px 10px;font-family:var(--mono);font-size:11px;color:var(--gold);width:70px;outline:none";
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const v=inp.value.trim().replace(/^#/,"").toLowerCase(); if(v&&!t.tags.includes(v)){ t.tags.push(v); save(); layoutStars(); renderList(); } renderTagEditor(t); } });
+  tr.appendChild(inp);
+}
+$("#sheet").addEventListener("click",e=>{ if(e.target===$("#sheet"))$("#sheet").classList.remove("open"); });
+$("#cTitle").addEventListener("blur",()=>{ if(!current)return; const v=$("#cTitle").textContent.trim(); if(v&&v!==current.title){current.title=v;save();layoutStars();renderList();} });
+$("#cSnooze").addEventListener("click",()=>{ if(!current)return;
+  if(snoozed(current)){ current.snoozeUntil=null; save(); toast("Welcome back to the sky"); }
+  else { current.snoozeUntil=Date.now()+7*86400000; save(); toast("Resting for a week"); }
+  $("#sheet").classList.remove("open"); layoutStars(); renderList(); });
+$("#cDelete").addEventListener("click",()=>{ if(!current)return; fadeStar(current.id); tasks=tasks.filter(x=>x.id!==current.id); save(); $("#sheet").classList.remove("open"); renderList(); });
+$("#cDone").addEventListener("click",()=>{ if(!current)return; current.done=true; current.doneAt=Date.now(); bumpStreak(); fadeStar(current.id); save(); $("#sheet").classList.remove("open"); renderList(); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]); });
+$("#cBreak").addEventListener("click",async()=>{ if(!current)return; const t=current,st=$("#cSteps");
+  st.innerHTML=`<div class="steps"><div class="lbl">A gentle way in</div><div class="stream dots"></div></div>`;
+  const sd=st.querySelector(".stream"); const steps=await getSteps(t.title,p=>{sd.textContent=p;sd.classList.remove("dots");}); t.steps=steps; save();
+  st.innerHTML=`<div class="steps"><div class="lbl">A gentle way in</div><ul>${steps.map(()=>"<li></li>").join("")}</ul></div>`; st.querySelectorAll("li").forEach((li,i)=>li.textContent=steps[i]); });
+function fadeStar(id){ const s=stars.find(s=>s.task.id===id); if(s){ s.task._fading=true; shootFrom(s.x,s.y); } }
+
+/* ---- cute details: toast, encouragements, shooting stars, wishes ---- */
+let toastTimer=null;
+function toast(msg){ const el=$("#toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),2600); }
+const CHEERS=["One star cleared. The sky thanks you.","Beautiful. That's momentum.","A little lighter now, isn't it?","Look at you go.","Wish granted. Onward, gently.","That one's at rest now.","You're tending your sky so well.","Small step, real progress."];
+const WHISPERS=["You don't have to finish the sky tonight — just this one star.","Every constellation started with a single point of light.","Rest is also part of the work.","You've done hard things before. This is one small step.","The stars aren't going anywhere. Take your time.","Being here, trying, already counts."];
+// shooting-star particles when a task completes
+let shooters=[];
+function shootFrom(x,y){ const ang=-1.15-( Math.random()-0.5)*0.3; shooters.push({x,y,vx:Math.cos(ang)*70,vy:Math.sin(ang)*70,life:1}); }
+
+/* ---- wish mode (gentle focus on the single most-worth-it star) ---- */
+function heatOf(t){ return (t.due&&t.due<Date.now()?100:0)+(t.pri==="now"?10:t.pri==="soon"?5:1)+ageDays(t); }
+let wishTask=null;
+async function openWish(){
+  const active=tasks.filter(t=>!t.done&&!snoozed(t)).sort((a,b)=>heatOf(b)-heatOf(a));
+  $("#wish").classList.add("open");
+  $("#wishWhisper").textContent=WHISPERS[Math.floor(Math.random()*WHISPERS.length)];
+  if(!active.length){ $("#wishTitle").textContent="Your sky is clear"; $("#wishWhy").textContent="Nothing needs you right now. Rest, stargazer."; $("#wishSteps").innerHTML=""; $("#wishDone").style.display="none"; $("#wishNext").style.display="none"; wishTask=null; return; }
+  $("#wishDone").style.display=""; $("#wishNext").style.display=active.length>1?"":"none";
+  showWish(active[0],active);
+}
+async function showWish(t,pool){
+  wishTask=t; $("#wishTitle").textContent=t.title; $("#wishWhy").textContent=whyLine(t);
+  const st=$("#wishSteps");
+  if(t.steps){ st.innerHTML=t.steps.map(s=>`<li></li>`).join(""); st.querySelectorAll("li").forEach((li,i)=>li.textContent=t.steps[i]); }
+  else { st.innerHTML='<li style="opacity:.6">finding a gentle first step…</li>'; const steps=await getSteps(t.title,null); t.steps=steps; save(); if(wishTask===t){ st.innerHTML=steps.map(()=>`<li></li>`).join(""); st.querySelectorAll("li").forEach((li,i)=>li.textContent=steps[i]); } }
+}
+$("#wishBtn").addEventListener("click",openWish);
+$("#wishClose").addEventListener("click",()=>$("#wish").classList.remove("open"));
+$("#wishNext").addEventListener("click",()=>{ const active=tasks.filter(t=>!t.done&&!snoozed(t)).sort((a,b)=>heatOf(b)-heatOf(a)); const i=active.findIndex(x=>x===wishTask); showWish(active[(i+1)%active.length],active); });
+$("#wishDone").addEventListener("click",()=>{ if(!wishTask)return; wishTask.done=true; wishTask.doneAt=Date.now(); bumpStreak(); fadeStar(wishTask.id); save(); renderList(); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]);
+  const rest=tasks.filter(t=>!t.done&&!snoozed(t)).sort((a,b)=>heatOf(b)-heatOf(a)); if(rest.length)showWish(rest[0],rest); else openWish(); });
+
+/* ---- daily sky report (a gentle open-of-day summary, once per day) ---- */
+const REPORT_KEY="constellate.report.v1";
+function greetWord(){ const h=new Date().getHours(); return h<5?"Still up":h<12?"Good morning":h<17?"Good afternoon":h<22?"Good evening":"Winding down"; }
+function buildReport(){
+  const active=tasks.filter(t=>!t.done&&!snoozed(t));
+  const now=Date.now();
+  const overdue=active.filter(t=>t.due&&t.due<now);
+  const today=active.filter(t=>t.due&&new Date(t.due).toDateString()===new Date().toDateString());
+  const nowPri=active.filter(t=>t.pri==="now");
+  const resting=tasks.filter(t=>!t.done&&snoozed(t));
+  let s={}; try{s=JSON.parse(localStorage.getItem(STREAK))||{}}catch(e){}
+  $("#reportGreet").textContent=greetWord()+", stargazer";
+  if(!active.length){ $("#reportLine").textContent="Your sky is clear. Name a star when you're ready."; $("#reportPoints").innerHTML=""; $("#reportWhisper").textContent=WHISPERS[Math.floor(Math.random()*WHISPERS.length)]; return; }
+  const brightest=active.slice().sort((a,b)=>heatOf(b)-heatOf(a))[0];
+  $("#reportLine").textContent=`${active.length} star${active.length>1?"s":""} in your sky right now.`;
+  const pts=[];
+  if(overdue.length)pts.push(`${overdue.length} ${overdue.length>1?"are":"is"} past due — a small step still counts.`);
+  else if(today.length)pts.push(`${today.length} due today.`);
+  if(nowPri.length)pts.push(`${nowPri.length} you marked to shine now.`);
+  if(brightest)pts.push(`Brightest tonight: ${brightest.title}.`);
+  if(resting.length)pts.push(`${resting.length} resting, drifting back soon.`);
+  if(s.count>1)pts.push(`You're on a ${s.count}-day streak.`);
+  $("#reportPoints").innerHTML=pts.slice(0,4).map(()=>"<li></li>").join("");
+  $("#reportPoints").querySelectorAll("li").forEach((li,i)=>li.textContent=pts[i]);
+  $("#reportWhisper").textContent=WHISPERS[Math.floor(Math.random()*WHISPERS.length)];
+}
+function openReport(){ buildReport(); $("#report").classList.add("open"); }
+function maybeShowReport(){ const today=new Date().toDateString(); if(localStorage.getItem(REPORT_KEY)===today)return; localStorage.setItem(REPORT_KEY,today); if(tasks.filter(t=>!t.done).length)openReport(); }
+$("#reportClose").addEventListener("click",()=>$("#report").classList.remove("open"));
+$("#reportFocus").addEventListener("click",()=>{ $("#report").classList.remove("open"); openWish(); });
+$("#report").addEventListener("click",e=>{ if(e.target===$("#report"))$("#report").classList.remove("open"); });
+
+/* list view */
+let listFilter="all";
+function renderList(){
+  let s={}; try{s=JSON.parse(localStorage.getItem(STREAK))||{}}catch(e){}
+  const cleared=tasks.filter(t=>t.done&&t.doneAt&&new Date(t.doneAt).toDateString()===new Date().toDateString()).length;
+  $("#listStreak").textContent=`${cleared} cleared today · ${s.count||0} day streak`;
+  const active=tasks.filter(t=>!t.done); const done=tasks.filter(t=>t.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+  const vis=list=>list.filter(t=>{ if(listFilter==="now"&&t.pri!=="now")return false; if(listFilter==="stale"&&!(ageDays(t)>=4||(t.due&&t.due<Date.now())))return false; return true; })
+    .sort((a,b)=>{ const H=x=>(x.due&&x.due<Date.now()?100:0)+(x.pri==="now"?10:x.pri==="soon"?5:0)+ageDays(x); return H(b)-H(a); });
+  const body=$("#listBody"); body.innerHTML="";
+  const rowEl=t=>{ const dl=dueLabel(t),a=Math.floor(ageDays(t)); const rest=snoozed(t); const el=document.createElement("div"); el.className="row"+(t.done?" done":"")+(rest?" resting":"");
+    el.innerHTML=`<div class="rtick"></div><div class="rbody"><div class="rt"></div><div class="rmeta">
+      ${rest?`<span class="resting-tag">resting ${restLabel(t)}</span>`:`<span class="${t.pri==="now"?"now":""}">${PRI[t.pri]}</span>${dl?`<span class="${dl.over?"over":""}">${dl.txt}</span>`:""}${a>=4&&!t.done?`<span>${a}d old</span>`:""}`}
+      ${t.tags.map(x=>`<span class="tag">#${x}</span>`).join("")}</div></div>`;
+    el.querySelector(".rt").textContent=t.title;
+    el.querySelector(".rtick").addEventListener("click",ev=>{ev.stopPropagation();toggleTask(t.id);});
+    el.addEventListener("click",()=>openTask(t)); return el; };
+  const section=(label,arr)=>{ if(!arr.length)return; const h=document.createElement("div"); h.className="zone-label"; h.textContent=label; body.appendChild(h); arr.forEach(t=>body.appendChild(rowEl(t))); };
+  const va=vis(active);
+  if(!va.length&&!done.length){ body.innerHTML='<div class="listempty">Your sky is clear. Name a star above.</div>'; return; }
+  // group strictly by priority: now, then this week, then eventually.
+  // within a bucket, overdue/older float to the top. resting stars sit at the end.
+  const within=(a,b)=>{ const H=x=>(x.due&&x.due<Date.now()?100:0)+(x.due?10-Math.min(9,Math.max(0,(x.due-Date.now())/86400000)):0)+ageDays(x)*0.1; return H(b)-H(a); };
+  const awake=va.filter(t=>!snoozed(t)); const resting=va.filter(t=>snoozed(t));
+  [["now","Now"],["soon","This week"],["someday","Eventually"]].forEach(([p,label])=>{
+    section(label,awake.filter(t=>t.pri===p).sort(within));
+  });
+  if(resting.length)section("Resting",resting.sort((a,b)=>a.snoozeUntil-b.snoozeUntil));
+  if(done.length)section("Faded",done.slice(0,20));
+}
+function toggleTask(id){ const t=tasks.find(x=>x.id===id); if(!t)return; t.done=!t.done; if(t.done){t.doneAt=Date.now();bumpStreak();fadeStar(id);toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]);} save(); layoutStars(); renderList(); }
+
+$("#seg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ $("#seg").querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); listFilter=b.dataset.f; renderList(); }));
+$("#backtop").addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
+window.addEventListener("scroll",()=>{ const y=window.scrollY; $("#scrollCue").style.opacity=y>40?"0":"1"; $("#backtop").style.display=y>H*0.5?"block":"none"; $(".capture").style.opacity=y>H*0.6?"0":"1"; $(".capture").style.pointerEvents=y>H*0.6?"none":"auto"; });
+
+/* capture + settings */
+const cap=$("#cap");
+// Enter -> let Gemini generate the whole star. If no key, fall back to the local
+// parse (addManual) and nudge the user to add a key.
+cap.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const v=cap.value.trim(); if(!v)return;
+  if(localStorage.getItem(AKEY)){ add(v); } else { addManual(v); banner("Add a free Gemini key in Settings to auto-generate stars."); }
+  cap.value=""; syncMirror(); } });
+// the + button opens the manual "new star" builder (you fill in the details)
+$("#add").addEventListener("click",()=>openNewStar(cap.value.trim()));
+// live #tag highlight in the capture box (mirror overlay)
+const capMirror=$("#capMirror");
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function syncMirror(){
+  const v=cap.value;
+  if(!v){ capMirror.innerHTML='<span class="ph">Name a star, press enter — AI fills in the rest</span>'; return; }
+  // highlight a #token only when it's # followed by 1+ word chars (a real tag, not a lone #)
+  capMirror.innerHTML=esc(v).replace(/#(\w+)/g,'<span class="tag">#$1</span>');
+  capMirror.scrollLeft=cap.scrollLeft;
+}
+cap.addEventListener("input",syncMirror);
+cap.addEventListener("scroll",()=>{capMirror.scrollLeft=cap.scrollLeft;});
+function anyModalOpen(){ return $("#sheet").classList.contains("open")||$("#settings").classList.contains("open")||$("#newstar").classList.contains("open")||$("#wish").classList.contains("open")||$("#report").classList.contains("open"); }
+window.addEventListener("focus",()=>{ if(!anyModalOpen())cap.focus(); });
+
+/* new-star builder (manual: title, tags, date, priority) */
+let nsPri="soon";
+function openNewStar(seed){
+  $("#nsTitle").value=seed||""; $("#nsTags").value=""; $("#nsDate").value="";
+  nsPri="soon"; $("#nsPrio").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.p==="soon"));
+  cap.value=""; syncMirror();
+  $("#newstar").classList.add("open"); setTimeout(()=>$("#nsTitle").focus(),0);
+}
+$("#nsPrio").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ nsPri=b.dataset.p; $("#nsPrio").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); }));
+$("#newstar").addEventListener("click",e=>{ if(e.target===$("#newstar"))$("#newstar").classList.remove("open"); });
+$("#nsCancel").addEventListener("click",()=>$("#newstar").classList.remove("open"));
+$("#nsSave").addEventListener("click",()=>{
+  const title=$("#nsTitle").value.trim(); if(!title)return;
+  const tags=[...new Set($("#nsTags").value.split(/[,#\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean))];
+  const dv=$("#nsDate").value; const due=dv?new Date(dv+"T09:00:00").getTime():null;
+  const cat=tags.includes("work")?"work":tags.includes("life")?"life":classify(title).cat;
+  const t={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),title,tags,cat,pri:nsPri,due,done:false,created:Date.now(),steps:null,snoozeUntil:null,desc:null,userTagged:tags.length>0};
+  tasks.unshift(t); save(); layoutStars(); renderList();
+  $("#newstar").classList.remove("open");
+  if(nsPri==="now")toast("A star burns brighter now"); else toast("A new star in your sky");
+});
+$("#gear").addEventListener("click",()=>{ $("#apiKey").value=localStorage.getItem(AKEY)||""; $("#notifToggle").classList.toggle("on",notifOn); $("#settings").classList.add("open"); });
+$("#settings").addEventListener("click",e=>{ if(e.target===$("#settings"))$("#settings").classList.remove("open"); });
+$("#saveKey").addEventListener("click",()=>{ const v=$("#apiKey").value.trim(); if(v){localStorage.setItem(AKEY,v);}else{localStorage.removeItem(AKEY);} $("#settings").classList.remove("open"); });
+$("#notifToggle").addEventListener("click",async()=>{ if(notifOn){ disableNotifs(); } else { await enableNotifs(); } $("#notifToggle").classList.toggle("on",notifOn); });
+/* keyboard-first flow */
+function closeModals(){ ["#sheet","#settings","#newstar","#wish","#report"].forEach(s=>{ const el=$(s); if(el)el.classList.remove("open"); }); }
+document.addEventListener("keydown",e=>{
+  const mod=e.metaKey||e.ctrlKey;
+  // Escape closes any open overlay
+  if(e.key==="Escape"){ closeModals(); return; }
+  // Cmd/Ctrl+K → jump to the capture bar from anywhere
+  if(mod&&e.key.toLowerCase()==="k"){ e.preventDefault(); closeModals(); window.scrollTo({top:0,behavior:"smooth"}); cap.focus(); return; }
+  // Cmd/Ctrl+Enter → open Focus (wish) mode
+  if(mod&&e.key==="Enter"){ e.preventDefault(); if($("#wish").classList.contains("open"))$("#wish").classList.remove("open"); else openWish(); return; }
+  // 1 / 2 / 3 → set priority on the currently open task (now / this week / eventually)
+  if(current&&$("#sheet").classList.contains("open")&&!e.metaKey&&!e.ctrlKey&&["1","2","3"].includes(e.key)){
+    const map={"1":"now","2":"soon","3":"someday"}; const btn=$("#cPrio").querySelector(`button[data-p="${map[e.key]}"]`); if(btn){ e.preventDefault(); btn.click(); }
+  }
+});
+function tickClock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}); }
+
+/* ---- gentle due-time notifications (native, opt-in) ---- */
+const NOTIF_KEY="constellate.notif.v1";
+let notifOn=localStorage.getItem(NOTIF_KEY)==="1";
+function notifSupported(){ return typeof Notification!=="undefined"; }
+async function enableNotifs(){
+  if(!notifSupported()){ banner("Notifications aren't available here."); return false; }
+  let p=Notification.permission;
+  if(p==="default")p=await Notification.requestPermission();
+  if(p==="granted"){ notifOn=true; localStorage.setItem(NOTIF_KEY,"1"); toast("Nudges on — I'll whisper when a star is due"); return true; }
+  banner("Notifications were blocked — enable them in System Settings."); return false;
+}
+function disableNotifs(){ notifOn=false; localStorage.setItem(NOTIF_KEY,"0"); toast("Nudges off"); }
+// fire a gentle notification the first time a due time passes for a task
+function checkDueNotifs(){
+  if(!notifOn||!notifSupported()||Notification.permission!=="granted")return;
+  const now=Date.now(); let changed=false;
+  tasks.forEach(t=>{ if(t.done||!t.due||t._notified)return;
+    if(t.due<=now){ try{ new Notification("A star is calling", {body:t.title, silent:true}); }catch(e){}
+      t._notified=true; changed=true; } });
+  if(changed)save();
+}
+
+/* boot */
+if(!tasks.length && !localStorage.getItem("constellate.seeded")){
+  ["work on my lab research #lab #work","practice for HPC competitions #hpc #work","sign up for math prep camp by friday #math #work","figure out where to hang out with a friend #friends","what mattress to buy #home","buy a nice bag #shopping"].forEach(add);
+  localStorage.setItem("constellate.seeded","1");
+}
+resize(); renderList(); tickClock(); setInterval(tickClock,20000); cap.focus(); requestAnimationFrame(draw);
+checkDueNotifs(); setInterval(checkDueNotifs,60000);
+setTimeout(maybeShowReport,600);
+})();
+</script>
+</body>
+</html>
