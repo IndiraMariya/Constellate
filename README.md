@@ -1,11 +1,4 @@
-# Constellate — a real macOS app with Tauri
-
-This is your calm task app wrapped in **Tauri v2** — a real, native macOS app (Rust +
-system webview, tiny and fast, no Electron). Unlike Pake, you own the whole shell, so it
-includes **real macOS window vibrancy** (the frosted-glass effect).
-
-This README is written to *teach*. Each file is explained so you understand what a Tauri
-app actually is, not just how to run it.
+# Constellate
 
 <p align="center">
   <img src="image1.png" width="49%" alt="Constellate — the night sky of tasks" />
